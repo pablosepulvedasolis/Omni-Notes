@@ -16,6 +16,7 @@
  */
 package it.feio.android.omninotes.models;
 
+import android.database.Cursor;
 import android.net.Uri;
 import android.os.Parcel;
 import android.os.Parcelable;
@@ -29,15 +30,16 @@ public class Attachment extends BaseAttachment implements Parcelable {
 
 
   public Attachment(Uri uri, String mimeType) {
-    this(Calendar.getInstance().getTimeInMillis(), uri, null, 0, 0, mimeType);
-  }
-
-
-  public Attachment(long id, Uri uri, String name, long size, long length, String mimeType) {
-    super(id, uri != null ? uri.getPath() : null, name, size, length, mimeType);
+    super(Calendar.getInstance().getTimeInMillis(), uri != null ? uri.getPath() : null, null, 0, 0, mimeType);
     setUri(uri);
   }
 
+  public Attachment(Cursor cursor) {
+    super(cursor.getLong(0),
+            Uri.parse(cursor.getString(1)) != null ? Uri.parse(cursor.getString(1)).getPath() : null,
+            cursor.getString(2), cursor.getInt(3), (long) cursor.getInt(4), cursor.getString(5));
+    setUri(Uri.parse(cursor.getString(1)));
+  }
 
   public Attachment(BaseAttachment attachment) {
     super(attachment.getId(), attachment.getUriPath(), attachment.getName(), attachment.getSize(),

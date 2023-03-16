@@ -818,9 +818,7 @@ public class DbHelper extends SQLiteOpenHelper {
       if (cursor.moveToFirst()) {
         Attachment mAttachment;
         do {
-          mAttachment = new Attachment(cursor.getLong(0),
-              Uri.parse(cursor.getString(1)), cursor.getString(2), cursor.getInt(3),
-              (long) cursor.getInt(4), cursor.getString(5));
+          mAttachment = new Attachment(cursor);
           attachmentsList.add(mAttachment);
         } while (cursor.moveToNext());
       }

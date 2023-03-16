@@ -143,6 +143,254 @@ public class SettingsFragment extends PreferenceFragmentCompat {
     return super.onOptionsItemSelected(item);
   }
 
+  // NEW
+  private void newExport(Preference export) {
+    export.setSummary(StorageHelper.getExternalStoragePublicDir().getAbsolutePath());
+    export.setOnPreferenceClickListener(arg0 -> {
+      if (VERSION.SDK_INT >= VERSION_CODES.O) {
+        var backupFolder = scopedStorageFolderChoosen();
+        if (backupFolder == null) {
+          startIntentForScopedStorage(ACCESS_DATA_FOR_EXPORT);
+        } else {
+          exportNotes();
+        }
+      } else {
+        PermissionsHelper
+                .requestPermission(getActivity(), permission.WRITE_EXTERNAL_STORAGE, R
+                                .string.permission_external_storage,
+                        getActivity().findViewById(R.id.crouton_handle), this::exportNotes);
+      }
+      return false;
+    });
+  }
+
+  // NEW
+  private void newImport(Preference importData) {
+    if (StringUtils.isEmpty(Prefs.getString(PREF_PASSWORD, ""))) {
+      importData.setSummary(getString(R.string.settings_import_summary));
+    }
+    importData.setOnPreferenceClickListener(arg0 -> {
+      if (VERSION.SDK_INT >= VERSION_CODES.O) {
+        var backupFolder = scopedStorageFolderChoosen();
+        if (backupFolder == null) {
+          Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE);
+          intent.putExtra(DocumentsContract.EXTRA_INITIAL_URI,
+                  StorageHelper.getOrCreateExternalStoragePublicDir());
+          startActivityForResult(intent, ACCESS_DATA_FOR_IMPORT);
+        } else {
+          importNotes(backupFolder);
+        }
+      } else {
+        PermissionsHelper
+                .requestPermission(getActivity(), Manifest.permission.WRITE_EXTERNAL_STORAGE, R
+                                .string.permission_external_storage,
+                        getActivity().findViewById(R.id.crouton_handle), this::importNotes);
+      }
+      return false;
+    });
+  }
+
+  private void newImportSpringpad(Preference importFromSpringpad) {
+    importFromSpringpad.setOnPreferenceClickListener(arg0 -> {
+      Intent intent;
+      intent = new Intent(Intent.ACTION_GET_CONTENT);
+      intent.addCategory(Intent.CATEGORY_OPENABLE);
+      intent.setType("application/zip");
+      if (!IntentChecker.isAvailable(getActivity(), intent, null)) {
+        Toast.makeText(getActivity(), R.string.feature_not_available_on_this_device,
+                Toast.LENGTH_SHORT).show();
+        return false;
+      }
+      startActivityForResult(intent, SPRINGPAD_IMPORT);
+      return false;
+    });
+  }
+
+  private void newSwipeToTrash(SwitchPreference swipeToTrash) {
+    if (Prefs.getBoolean("settings_swipe_to_trash", false)) {
+      swipeToTrash.setChecked(true);
+      swipeToTrash
+              .setSummary(getResources().getString(R.string.settings_swipe_to_trash_summary_2));
+    } else {
+      swipeToTrash.setChecked(false);
+      swipeToTrash
+              .setSummary(getResources().getString(R.string.settings_swipe_to_trash_summary_1));
+    }
+    swipeToTrash.setOnPreferenceChangeListener((preference, newValue) -> {
+      if ((Boolean) newValue) {
+        swipeToTrash
+                .setSummary(getResources().getString(R.string.settings_swipe_to_trash_summary_2));
+      } else {
+        swipeToTrash
+                .setSummary(getResources().getString(R.string.settings_swipe_to_trash_summary_1));
+      }
+      return true;
+    });
+  }
+
+  private void newColorsWidget(ListPreference colorsWidget) {
+    int colorsWidgetIndex = colorsWidget
+            .findIndexOfValue(Prefs.getString("settings_colors_widget",
+                    PREF_COLORS_APP_DEFAULT));
+    String colorsWidgetString = getResources()
+            .getStringArray(R.array.colors_widget)[colorsWidgetIndex];
+    colorsWidget.setSummary(colorsWidgetString);
+    colorsWidget.setOnPreferenceChangeListener((preference, newValue) -> {
+      int colorsWidgetIndex1 = colorsWidget.findIndexOfValue(newValue.toString());
+      String colorsWidgetString1 = getResources()
+              .getStringArray(R.array.colors_widget)[colorsWidgetIndex1];
+      colorsWidget.setSummary(colorsWidgetString1);
+      Prefs.edit().putString("settings_colors_widget", newValue.toString()).apply();
+      colorsWidget.setValueIndex(colorsWidgetIndex1);
+      return false;
+    });
+  }
+
+  private void newPasswordAccess(SwitchPreference passwordAccess) {
+    if (Prefs.getString(PREF_PASSWORD, null) == null) {
+      passwordAccess.setEnabled(false);
+      passwordAccess.setChecked(false);
+    } else {
+      passwordAccess.setEnabled(true);
+    }
+    passwordAccess.setOnPreferenceChangeListener((preference, newValue) -> {
+      PasswordHelper.requestPassword(getActivity(), passwordConfirmed -> {
+        if (passwordConfirmed.equals(Result.SUCCEED)) {
+          passwordAccess.setChecked((Boolean) newValue);
+        }
+      });
+      return true;
+    });
+  }
+
+  private void newColorsApp(ListPreference colorsApp) {
+    int colorsAppIndex = colorsApp.findIndexOfValue(Prefs.getString("settings_colors_app",
+            PREF_COLORS_APP_DEFAULT));
+    String colorsAppString = getResources().getStringArray(R.array.colors_app)[colorsAppIndex];
+    colorsApp.setSummary(colorsAppString);
+    colorsApp.setOnPreferenceChangeListener((preference, newValue) -> {
+      int colorsAppIndex1 = colorsApp.findIndexOfValue(newValue.toString());
+      String colorsAppString1 = getResources()
+              .getStringArray(R.array.colors_app)[colorsAppIndex1];
+      colorsApp.setSummary(colorsAppString1);
+      Prefs.edit().putString("settings_colors_app", newValue.toString()).apply();
+      colorsApp.setValueIndex(colorsAppIndex1);
+      return false;
+    });
+  }
+
+  private void newChecklist(ListPreference checklist) {
+    int checklistIndex = checklist
+            .findIndexOfValue(Prefs.getString("settings_checked_items_behavior", "0"));
+    String checklistString = getResources()
+            .getStringArray(R.array.checked_items_behavior)[checklistIndex];
+    checklist.setSummary(checklistString);
+    checklist.setOnPreferenceChangeListener((preference, newValue) -> {
+      int checklistIndex1 = checklist.findIndexOfValue(newValue.toString());
+      String checklistString1 = getResources().getStringArray(R.array.checked_items_behavior)
+              [checklistIndex1];
+      checklist.setSummary(checklistString1);
+      Prefs.edit().putString("settings_checked_items_behavior", newValue.toString()).apply();
+      checklist.setValueIndex(checklistIndex1);
+      return false;
+    });
+  }
+
+  private void newRingtone(Preference ringtone) {
+    ringtone.setOnPreferenceClickListener(arg0 -> {
+      if (VERSION.SDK_INT >= VERSION_CODES.O) {
+        new NotificationsHelper(getContext()).updateNotificationChannelsSound();
+      } else {
+        Intent intent = new Intent(RingtoneManager.ACTION_RINGTONE_PICKER);
+        intent.putExtra(RingtoneManager.EXTRA_RINGTONE_TYPE, RingtoneManager.TYPE_NOTIFICATION);
+        intent.putExtra(RingtoneManager.EXTRA_RINGTONE_SHOW_DEFAULT, true);
+        intent.putExtra(RingtoneManager.EXTRA_RINGTONE_SHOW_SILENT, true);
+        intent.putExtra(RingtoneManager.EXTRA_RINGTONE_DEFAULT_URI, DEFAULT_NOTIFICATION_URI);
+
+        String existingValue = Prefs.getString("settings_notification_ringtone", null);
+        if (existingValue != null) {
+          if (existingValue.length() == 0) {
+            // Select "Silent"
+            intent.putExtra(EXTRA_RINGTONE_EXISTING_URI, (Uri) null);
+          } else {
+            intent.putExtra(EXTRA_RINGTONE_EXISTING_URI, Uri.parse(existingValue));
+          }
+        } else {
+          // No ringtone has been selected, set to the default
+          intent.putExtra(EXTRA_RINGTONE_EXISTING_URI, DEFAULT_NOTIFICATION_URI);
+        }
+
+        startActivityForResult(intent, RINGTONE_REQUEST_CODE);
+      }
+
+      return false;
+    });
+  }
+
+  private void newChangeLog(Preference changelog) {
+    changelog.setOnPreferenceClickListener(arg0 -> {
+      new MaterialDialog.Builder(getContext())
+              .customView(R.layout.activity_changelog, false)
+              .positiveText(R.string.ok)
+              .build().show();
+      return false;
+    });
+    try {
+      changelog.setSummary(AppVersionHelper.getCurrentAppVersionName(getActivity()));
+    } catch (NameNotFoundException e) {
+      LogDelegate.e("Error retrieving version", e);
+    }
+  }
+
+  private void newResetData(Preference resetData) {
+    resetData.setOnPreferenceClickListener(arg0 -> {
+
+      new MaterialDialog.Builder(getContext())
+              .content(R.string.reset_all_data_confirmation)
+              .positiveText(R.string.confirm)
+              .onPositive((dialog, which) -> {
+                Prefs.edit().clear().apply();
+                File db = getActivity().getDatabasePath(DATABASE_NAME);
+                StorageHelper.delete(getActivity(), db.getAbsolutePath());
+                File attachmentsDir = StorageHelper.getAttachmentDir();
+                StorageHelper.delete(getActivity(), attachmentsDir.getAbsolutePath());
+                File cacheDir = StorageHelper.getCacheDir(getActivity());
+                StorageHelper.delete(getActivity(), cacheDir.getAbsolutePath());
+                Prefs.edit().clear().apply();
+                SystemHelper.restartApp(getActivity().getApplicationContext(), MainActivity.class);
+              }).build().show();
+
+      return false;
+    });
+  }
+
+  private void newEnableFileLogging(SwitchPreference enableFileLogging) {
+    enableFileLogging.setOnPreferenceChangeListener((preference, newValue) -> {
+      if ((Boolean) newValue) {
+        PermissionsHelper
+                .requestPermission(getActivity(), permission.WRITE_EXTERNAL_STORAGE, R
+                                .string.permission_external_storage,
+                        getActivity().findViewById(R.id.crouton_handle),
+                        () -> enableFileLogging.setChecked(true));
+      } else {
+        enableFileLogging.setChecked(false);
+      }
+      return false;
+    });
+  }
+
+  private void newInstructions(Preference instructions) {
+    instructions.setOnPreferenceClickListener(arg0 -> {
+      new MaterialDialog.Builder(getActivity())
+              .content(getString(R.string.settings_tour_show_again_summary) + "?")
+              .positiveText(R.string.confirm)
+              .onPositive((dialog, which) -> {
+                startActivity(new Intent(getContext(), IntroActivity.class));
+              }).build().show();
+      return false;
+    });
+  }
+
   @Override
   public void onResume() {
     super.onResume();
@@ -152,50 +400,13 @@ public class SettingsFragment extends PreferenceFragmentCompat {
     // Export notes
     Preference export = findPreference("settings_export_data");
     if (export != null) {
-      export.setSummary(StorageHelper.getExternalStoragePublicDir().getAbsolutePath());
-      export.setOnPreferenceClickListener(arg0 -> {
-        if (VERSION.SDK_INT >= VERSION_CODES.O) {
-          var backupFolder = scopedStorageFolderChoosen();
-          if (backupFolder == null) {
-            startIntentForScopedStorage(ACCESS_DATA_FOR_EXPORT);
-          } else {
-            exportNotes();
-          }
-        } else {
-          PermissionsHelper
-              .requestPermission(getActivity(), permission.WRITE_EXTERNAL_STORAGE, R
-                      .string.permission_external_storage,
-                  getActivity().findViewById(R.id.crouton_handle), this::exportNotes);
-        }
-        return false;
-      });
+      newExport(export);
     }
 
     // Import notes
     Preference importData = findPreference("settings_import_data");
     if (importData != null) {
-      if (StringUtils.isEmpty(Prefs.getString(PREF_PASSWORD, ""))) {
-        importData.setSummary(getString(R.string.settings_import_summary));
-      }
-      importData.setOnPreferenceClickListener(arg0 -> {
-        if (VERSION.SDK_INT >= VERSION_CODES.O) {
-          var backupFolder = scopedStorageFolderChoosen();
-          if (backupFolder == null) {
-            Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE);
-            intent.putExtra(DocumentsContract.EXTRA_INITIAL_URI,
-                StorageHelper.getOrCreateExternalStoragePublicDir());
-            startActivityForResult(intent, ACCESS_DATA_FOR_IMPORT);
-          } else {
-            importNotes(backupFolder);
-          }
-        } else {
-        PermissionsHelper
-            .requestPermission(getActivity(), Manifest.permission.WRITE_EXTERNAL_STORAGE, R
-                    .string.permission_external_storage,
-                getActivity().findViewById(R.id.crouton_handle), this::importNotes);
-        }
-        return false;
-      });
+      newImport(importData);
     }
 
 //		// Autobackup feature integrity check
@@ -257,19 +468,7 @@ public class SettingsFragment extends PreferenceFragmentCompat {
 
     Preference importFromSpringpad = findPreference("settings_import_from_springpad");
     if (importFromSpringpad != null) {
-      importFromSpringpad.setOnPreferenceClickListener(arg0 -> {
-        Intent intent;
-        intent = new Intent(Intent.ACTION_GET_CONTENT);
-        intent.addCategory(Intent.CATEGORY_OPENABLE);
-        intent.setType("application/zip");
-        if (!IntentChecker.isAvailable(getActivity(), intent, null)) {
-          Toast.makeText(getActivity(), R.string.feature_not_available_on_this_device,
-              Toast.LENGTH_SHORT).show();
-          return false;
-        }
-        startActivityForResult(intent, SPRINGPAD_IMPORT);
-        return false;
-      });
+      newImportSpringpad(importFromSpringpad);
     }
 
 //		Preference syncWithDrive = findPreference("settings_backup_drive");
@@ -293,25 +492,7 @@ public class SettingsFragment extends PreferenceFragmentCompat {
     // Swiping action
     final SwitchPreference swipeToTrash = findPreference("settings_swipe_to_trash");
     if (swipeToTrash != null) {
-      if (Prefs.getBoolean("settings_swipe_to_trash", false)) {
-        swipeToTrash.setChecked(true);
-        swipeToTrash
-            .setSummary(getResources().getString(R.string.settings_swipe_to_trash_summary_2));
-      } else {
-        swipeToTrash.setChecked(false);
-        swipeToTrash
-            .setSummary(getResources().getString(R.string.settings_swipe_to_trash_summary_1));
-      }
-      swipeToTrash.setOnPreferenceChangeListener((preference, newValue) -> {
-        if ((Boolean) newValue) {
-          swipeToTrash
-              .setSummary(getResources().getString(R.string.settings_swipe_to_trash_summary_2));
-        } else {
-          swipeToTrash
-              .setSummary(getResources().getString(R.string.settings_swipe_to_trash_summary_1));
-        }
-        return true;
-      });
+      newSwipeToTrash(swipeToTrash);
     }
 
     // Show uncategorized notes in menu
@@ -352,20 +533,7 @@ public class SettingsFragment extends PreferenceFragmentCompat {
     // Use password to grant application access
     final SwitchPreference passwordAccess = findPreference("settings_password_access");
     if (passwordAccess != null) {
-      if (Prefs.getString(PREF_PASSWORD, null) == null) {
-        passwordAccess.setEnabled(false);
-        passwordAccess.setChecked(false);
-      } else {
-        passwordAccess.setEnabled(true);
-      }
-      passwordAccess.setOnPreferenceChangeListener((preference, newValue) -> {
-        PasswordHelper.requestPassword(getActivity(), passwordConfirmed -> {
-          if (passwordConfirmed.equals(Result.SUCCEED)) {
-            passwordAccess.setChecked((Boolean) newValue);
-          }
-        });
-        return true;
-      });
+      newPasswordAccess(passwordAccess);
     }
 
     // Languages
@@ -385,91 +553,25 @@ public class SettingsFragment extends PreferenceFragmentCompat {
     // Application's colors
     final ListPreference colorsApp = findPreference("settings_colors_app");
     if (colorsApp != null) {
-      int colorsAppIndex = colorsApp.findIndexOfValue(Prefs.getString("settings_colors_app",
-          PREF_COLORS_APP_DEFAULT));
-      String colorsAppString = getResources().getStringArray(R.array.colors_app)[colorsAppIndex];
-      colorsApp.setSummary(colorsAppString);
-      colorsApp.setOnPreferenceChangeListener((preference, newValue) -> {
-        int colorsAppIndex1 = colorsApp.findIndexOfValue(newValue.toString());
-        String colorsAppString1 = getResources()
-            .getStringArray(R.array.colors_app)[colorsAppIndex1];
-        colorsApp.setSummary(colorsAppString1);
-        Prefs.edit().putString("settings_colors_app", newValue.toString()).apply();
-        colorsApp.setValueIndex(colorsAppIndex1);
-        return false;
-      });
+      newColorsApp(colorsApp);
     }
 
     // Checklists
     final ListPreference checklist = findPreference("settings_checked_items_behavior");
     if (checklist != null) {
-      int checklistIndex = checklist
-          .findIndexOfValue(Prefs.getString("settings_checked_items_behavior", "0"));
-      String checklistString = getResources()
-          .getStringArray(R.array.checked_items_behavior)[checklistIndex];
-      checklist.setSummary(checklistString);
-      checklist.setOnPreferenceChangeListener((preference, newValue) -> {
-        int checklistIndex1 = checklist.findIndexOfValue(newValue.toString());
-        String checklistString1 = getResources().getStringArray(R.array.checked_items_behavior)
-            [checklistIndex1];
-        checklist.setSummary(checklistString1);
-        Prefs.edit().putString("settings_checked_items_behavior", newValue.toString()).apply();
-        checklist.setValueIndex(checklistIndex1);
-        return false;
-      });
+      newChecklist(checklist);
     }
 
     // Widget's colors
     final ListPreference colorsWidget = findPreference("settings_colors_widget");
     if (colorsWidget != null) {
-      int colorsWidgetIndex = colorsWidget
-          .findIndexOfValue(Prefs.getString("settings_colors_widget",
-              PREF_COLORS_APP_DEFAULT));
-      String colorsWidgetString = getResources()
-          .getStringArray(R.array.colors_widget)[colorsWidgetIndex];
-      colorsWidget.setSummary(colorsWidgetString);
-      colorsWidget.setOnPreferenceChangeListener((preference, newValue) -> {
-        int colorsWidgetIndex1 = colorsWidget.findIndexOfValue(newValue.toString());
-        String colorsWidgetString1 = getResources()
-            .getStringArray(R.array.colors_widget)[colorsWidgetIndex1];
-        colorsWidget.setSummary(colorsWidgetString1);
-        Prefs.edit().putString("settings_colors_widget", newValue.toString()).apply();
-        colorsWidget.setValueIndex(colorsWidgetIndex1);
-        return false;
-      });
+      newColorsWidget(colorsWidget);
     }
 
     // Ringtone selection
     final Preference ringtone = findPreference("settings_notification_ringtone");
     if (ringtone != null) {
-      ringtone.setOnPreferenceClickListener(arg0 -> {
-        if (VERSION.SDK_INT >= VERSION_CODES.O) {
-          new NotificationsHelper(getContext()).updateNotificationChannelsSound();
-        } else {
-          Intent intent = new Intent(RingtoneManager.ACTION_RINGTONE_PICKER);
-          intent.putExtra(RingtoneManager.EXTRA_RINGTONE_TYPE, RingtoneManager.TYPE_NOTIFICATION);
-          intent.putExtra(RingtoneManager.EXTRA_RINGTONE_SHOW_DEFAULT, true);
-          intent.putExtra(RingtoneManager.EXTRA_RINGTONE_SHOW_SILENT, true);
-          intent.putExtra(RingtoneManager.EXTRA_RINGTONE_DEFAULT_URI, DEFAULT_NOTIFICATION_URI);
-
-          String existingValue = Prefs.getString("settings_notification_ringtone", null);
-          if (existingValue != null) {
-            if (existingValue.length() == 0) {
-              // Select "Silent"
-              intent.putExtra(EXTRA_RINGTONE_EXISTING_URI, (Uri) null);
-            } else {
-              intent.putExtra(EXTRA_RINGTONE_EXISTING_URI, Uri.parse(existingValue));
-            }
-          } else {
-            // No ringtone has been selected, set to the default
-            intent.putExtra(EXTRA_RINGTONE_EXISTING_URI, DEFAULT_NOTIFICATION_URI);
-          }
-
-          startActivityForResult(intent, RINGTONE_REQUEST_CODE);
-        }
-
-        return false;
-      });
+      newRingtone(ringtone);
     }
 
     // Notification snooze delay
@@ -497,73 +599,25 @@ public class SettingsFragment extends PreferenceFragmentCompat {
     // Changelog
     Preference changelog = findPreference("settings_changelog");
     if (changelog != null) {
-      changelog.setOnPreferenceClickListener(arg0 -> {
-        new MaterialDialog.Builder(getContext())
-            .customView(R.layout.activity_changelog, false)
-            .positiveText(R.string.ok)
-            .build().show();
-        return false;
-      });
-      try {
-        changelog.setSummary(AppVersionHelper.getCurrentAppVersionName(getActivity()));
-      } catch (NameNotFoundException e) {
-        LogDelegate.e("Error retrieving version", e);
-      }
+      newChangeLog(changelog);
     }
 
     // Settings reset
     Preference resetData = findPreference("reset_all_data");
     if (resetData != null) {
-      resetData.setOnPreferenceClickListener(arg0 -> {
-
-        new MaterialDialog.Builder(getContext())
-            .content(R.string.reset_all_data_confirmation)
-            .positiveText(R.string.confirm)
-            .onPositive((dialog, which) -> {
-              Prefs.edit().clear().apply();
-              File db = getActivity().getDatabasePath(DATABASE_NAME);
-              StorageHelper.delete(getActivity(), db.getAbsolutePath());
-              File attachmentsDir = StorageHelper.getAttachmentDir();
-              StorageHelper.delete(getActivity(), attachmentsDir.getAbsolutePath());
-              File cacheDir = StorageHelper.getCacheDir(getActivity());
-              StorageHelper.delete(getActivity(), cacheDir.getAbsolutePath());
-              Prefs.edit().clear().apply();
-              SystemHelper.restartApp(getActivity().getApplicationContext(), MainActivity.class);
-            }).build().show();
-
-        return false;
-      });
+      newResetData(resetData);
     }
 
     // Logs on files activation
     final SwitchPreference enableFileLogging = findPreference(PREF_ENABLE_FILE_LOGGING);
     if (enableFileLogging != null) {
-      enableFileLogging.setOnPreferenceChangeListener((preference, newValue) -> {
-        if ((Boolean) newValue) {
-          PermissionsHelper
-              .requestPermission(getActivity(), permission.WRITE_EXTERNAL_STORAGE, R
-                      .string.permission_external_storage,
-                  getActivity().findViewById(R.id.crouton_handle),
-                  () -> enableFileLogging.setChecked(true));
-        } else {
-          enableFileLogging.setChecked(false);
-        }
-        return false;
-      });
+      newEnableFileLogging(enableFileLogging);
     }
 
     // Instructions
     Preference instructions = findPreference("settings_tour_show_again");
     if (instructions != null) {
-      instructions.setOnPreferenceClickListener(arg0 -> {
-        new MaterialDialog.Builder(getActivity())
-            .content(getString(R.string.settings_tour_show_again_summary) + "?")
-            .positiveText(R.string.confirm)
-            .onPositive((dialog, which) -> {
-              startActivity(new Intent(getContext(), IntroActivity.class));
-            }).build().show();
-        return false;
-      });
+      newInstructions(instructions);
     }
   }
 
