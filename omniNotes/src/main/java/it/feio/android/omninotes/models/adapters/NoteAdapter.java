@@ -17,11 +17,9 @@
 package it.feio.android.omninotes.models.adapters;
 
 import static com.bumptech.glide.load.resource.drawable.DrawableTransitionOptions.withCrossFade;
-import static it.feio.android.omninotes.utils.ConstantsBase.PREF_COLORS_APP_DEFAULT;
 import static it.feio.android.omninotes.utils.ConstantsBase.TIMESTAMP_UNIX_EPOCH_FAR;
 
 import android.app.Activity;
-import android.graphics.Color;
 import android.net.Uri;
 import android.os.AsyncTask;
 import android.text.Spanned;
@@ -57,6 +55,7 @@ public class NoteAdapter extends RecyclerView.Adapter<NoteViewHolder> {
   private final boolean expandedView;
   private long closestNoteReminder = Long.parseLong(TIMESTAMP_UNIX_EPOCH_FAR);
   private int closestNotePosition;
+  private ColorManager colorManager = new ColorManager();
 
 
   public NoteAdapter(Activity activity, boolean expandedView, List<Note> notes) {
@@ -76,7 +75,7 @@ public class NoteAdapter extends RecyclerView.Adapter<NoteViewHolder> {
       holder.cardLayout
           .setBackgroundColor(mActivity.getResources().getColor(R.color.list_bg_selected));
     } else {
-      restoreDrawable(note, holder.cardLayout, holder);
+      colorManager.restoreDrawable(note, holder.cardLayout, holder);
     }
   }
 
@@ -205,56 +204,7 @@ public class NoteAdapter extends RecyclerView.Adapter<NoteViewHolder> {
 
 
   public void restoreDrawable(Note note, View v) {
-    restoreDrawable(note, v, null);
-  }
-
-
-  public void restoreDrawable(Note note, View v, NoteViewHolder holder) {
-    final int paddingBottom = v.getPaddingBottom();
-    final int paddingLeft = v.getPaddingLeft();
-    final int paddingRight = v.getPaddingRight();
-    final int paddingTop = v.getPaddingTop();
-    v.setPadding(paddingLeft, paddingTop, paddingRight, paddingBottom);
-    colorNote(note, v, holder);
-  }
-
-
-  @SuppressWarnings("unused")
-  private void colorNote(Note note, View v) {
-    colorNote(note, v, null);
-  }
-
-
-  /**
-   * Color of category marker if note is categorized a function is active in preferences
-   */
-  private void colorNote(Note note, View v, NoteViewHolder holder) {
-
-    String colorsPref = Prefs.getString("settings_colors_app", PREF_COLORS_APP_DEFAULT);
-
-    // Checking preference
-    if (!colorsPref.equals("disabled")) {
-
-      // Resetting transparent color to the view
-      v.setBackgroundColor(Color.parseColor("#00000000"));
-
-      // If category is set the color will be applied on the appropriate target
-      if (note.getCategory() != null && note.getCategory().getColor() != null) {
-        if (colorsPref.equals("complete") || colorsPref.equals("list")) {
-          v.setBackgroundColor(Integer.parseInt(note.getCategory().getColor()));
-        } else {
-          if (holder != null) {
-            holder.categoryMarker
-                .setBackgroundColor(Integer.parseInt(note.getCategory().getColor()));
-          } else {
-            v.findViewById(R.id.category_marker)
-                .setBackgroundColor(Integer.parseInt(note.getCategory().getColor()));
-          }
-        }
-      } else {
-        v.findViewById(R.id.category_marker).setBackgroundColor(0);
-      }
-    }
+    colorManager.restoreDrawable(note, v, null);
   }
 
   public void replace(@NonNull Note note, int index) {
