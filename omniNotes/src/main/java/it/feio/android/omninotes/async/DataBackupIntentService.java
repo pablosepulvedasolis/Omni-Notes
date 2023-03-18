@@ -55,6 +55,7 @@ public class DataBackupIntentService extends IntentService implements OnAttachin
   public static final String ACTION_DATA_EXPORT = "action_data_export";
   public static final String ACTION_DATA_IMPORT = "action_data_import";
   public static final String ACTION_DATA_DELETE = "action_data_delete";
+  private static BackupHelper backupHelper;
 
   private NotificationsHelper mNotificationsHelper;
 
@@ -107,9 +108,8 @@ public class DataBackupIntentService extends IntentService implements OnAttachin
     var backupDir = DocumentFileCompat.Companion.fromTreeUri(getBaseContext(),
         Uri.parse(Prefs.getString(PREF_BACKUP_FOLDER_URI, null))).createDirectory(backupName);
 
-    BackupHelper.exportNotes(backupDir);
-    BackupHelper.exportAttachments(backupDir, mNotificationsHelper);
-    mNotificationsHelper.finish(getString(R.string.data_export_completed), backupDir.getUri().getPath());
+    exportAll(backupDir, mNotificationsHelper, getString(R.string.data_export_completed),
+            getString(R.string.data_export_completed));
   }
 
   private synchronized void exportDataWithoutScopedStorage(Intent intent) {
@@ -121,10 +121,13 @@ public class DataBackupIntentService extends IntentService implements OnAttachin
     // Directory is re-created in case of previously used backup name (removed above)
     backupDir = StorageHelper.getOrCreateBackupDir(backupName);
 
-    BackupHelper.exportNotes(DocumentFileCompat.Companion.fromFile(getBaseContext(), backupDir));
-    BackupHelper.exportAttachments(
-        DocumentFileCompat.Companion.fromFile(getBaseContext(), backupDir), mNotificationsHelper);
-    mNotificationsHelper.finish(getString(R.string.data_export_completed), backupDir.getAbsolutePath());
+    exportAll(DocumentFileCompat.Companion.fromFile(getBaseContext(), backupDir),
+            mNotificationsHelper, getString(R.string.data_export_completed), backupDir.getAbsolutePath());
+  }
+
+  private void exportAll(DocumentFileCompat docFile, NotificationsHelper mNotificationsHelper,
+                         String title, String path) {
+    backupHelper.exportNotesAll(docFile, mNotificationsHelper, title, path);
   }
 
   private synchronized void importData(Intent intent) {
@@ -140,8 +143,8 @@ public class DataBackupIntentService extends IntentService implements OnAttachin
 
     var backupDirDocumentFile = DocumentFileCompat.Companion.fromFile(getBaseContext(),
         backupDir);
-    BackupHelper.importNotes(backupDirDocumentFile);
-    BackupHelper.importAttachments(backupDirDocumentFile, mNotificationsHelper);
+
+    importAll(backupDirDocumentFile, mNotificationsHelper);
 
     resetReminders();
     mNotificationsHelper.cancel();
@@ -157,6 +160,11 @@ public class DataBackupIntentService extends IntentService implements OnAttachin
 //        }
   }
 
+
+  private void importAll(DocumentFileCompat backupDir, NotificationsHelper mNotificationsHelper) {
+    backupHelper.importNotesAll(backupDir, mNotificationsHelper);
+  }
+
   @TargetApi(VERSION_CODES.LOLLIPOP)
   private synchronized void importDataWithScopedStorage(Intent intent) {
     var backupDir = Observable.from(DocumentFileCompat.Companion.fromTreeUri(getBaseContext(),
@@ -164,8 +172,7 @@ public class DataBackupIntentService extends IntentService implements OnAttachin
         .filter(f -> f.getName().equals(intent.getStringExtra(INTENT_BACKUP_NAME))).toBlocking()
         .single();
 
-    BackupHelper.importNotes(backupDir);
-    BackupHelper.importAttachments(backupDir, mNotificationsHelper);
+    importAll(backupDir, mNotificationsHelper);
 
     resetReminders();
     mNotificationsHelper.cancel();

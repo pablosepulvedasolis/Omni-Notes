@@ -57,6 +57,13 @@ import rx.Observable;
 @UtilityClass
 public final class BackupHelper {
 
+  public static void exportNotesAll(DocumentFileCompat docFile, NotificationsHelper mNotificationsHelper,
+                                    String title, String path) {
+    exportNotes(docFile);
+    exportAttachments(docFile, mNotificationsHelper);
+    mNotificationsHelper.finish(title, path);
+  }
+
   public static void exportNotes(DocumentFileCompat backupDir) {
     for (Note note : DbHelper.getInstance(true).getAllNotes(false)) {
       exportNote(backupDir, note);
@@ -141,6 +148,11 @@ public final class BackupHelper {
       LogDelegate.e("Error during attachment backup: " + attachment.getUriPath(), e);
       throw new BackupAttachmentException(e);
     }
+  }
+
+  public static void importNotesAll(DocumentFileCompat backupDir, NotificationsHelper mNotificationsHelper) {
+    importNotes(backupDir);
+    importAttachments(backupDir, mNotificationsHelper);
   }
 
   public static List<Note> importNotes(DocumentFileCompat backupDir) {
