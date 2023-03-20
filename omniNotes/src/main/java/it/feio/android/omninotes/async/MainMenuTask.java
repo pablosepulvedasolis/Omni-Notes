@@ -39,8 +39,48 @@ import it.feio.android.omninotes.utils.Navigation;
 import java.lang.ref.WeakReference;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.HashMap;
 
+public enum NavigationTypes { REMINDER{
+  @Override
+  public boolean checkNavigation(boolean dynamicMenu, DynamicNavigationLookupTable dynamicNavigationLookupTable){
+    if (dynamicMenu && dynamicNavigationLookupTable.getReminders() == 0) {
+      return true;
+    }
+    return false;
+  }
+},
+  UNCATEGORIZED {
+    @Override
+    public boolean checkNavigation(boolean dynamicMenu, DynamicNavigationLookupTable dynamicNavigationLookupTable){
+      boolean showUncategorized = Prefs.getBoolean(PREF_SHOW_UNCATEGORIZED, false);
+      if (!showUncategorized || ( dynamicMenu&& dynamicNavigationLookupTable.getUncategorized() == 0)) {
+        return true;
+      }
+      return false;
+    }
+  },
+  TRASH {
+    @Override
+    public boolean checkNavigation(boolean dynamicMenu, DynamicNavigationLookupTable dynamicNavigationLookupTable){
+      if (dynamicMenu && dynamicNavigationLookupTable.getTrashed() == 0) {
+        return true;
+      }
+      return false;
+    }
+  },
+  ARCHIVE {
+    @Override
+    public boolean checkNavigation(boolean dynamicMenu, DynamicNavigationLookupTable dynamicNavigationLookupTable) {
+      if (dynamicMenu && dynamicNavigationLookupTable.getArchived() == 0) {
+        return true;
+      }
+      return false;
+    }
+  };
 
+  public abstract boolean checkNavigation(boolean dynamicMenu, DynamicNavigationLookupTable dynamicNavigationLookupTable);
+}
 public class MainMenuTask extends AsyncTask<Void, Void, List<NavigationItem>> {
 
   private final WeakReference<Fragment> mFragmentWeakReference;
@@ -68,7 +108,7 @@ public class MainMenuTask extends AsyncTask<Void, Void, List<NavigationItem>> {
       mDrawerList.setAdapter(new NavDrawerAdapter(mainActivity, items));
       mDrawerList.setOnItemClickListener((arg0, arg1, position, arg3) -> {
         String navigation = mFragmentWeakReference.get().getResources().getStringArray(R.array
-            .navigation_list_codes)[items.get(position).getArrayIndex()];
+                .navigation_list_codes)[items.get(position).getArrayIndex()];
         updateNavigation(position, navigation);
       });
       mDrawerList.justifyListViewHeightBasedOnChildren();
@@ -83,15 +123,15 @@ public class MainMenuTask extends AsyncTask<Void, Void, List<NavigationItem>> {
       }
       mainActivity.getIntent().setAction(Intent.ACTION_MAIN);
       EventBus.getDefault()
-          .post(new NavigationUpdatedEvent(mDrawerList.getItemAtPosition(position)));
+              .post(new NavigationUpdatedEvent(mDrawerList.getItemAtPosition(position)));
     }
   }
 
   private boolean isAlive() {
     return mFragmentWeakReference.get() != null
-        && mFragmentWeakReference.get().isAdded()
-        && mFragmentWeakReference.get().getActivity() != null
-        && !mFragmentWeakReference.get().getActivity().isFinishing();
+            && mFragmentWeakReference.get().isAdded()
+            && mFragmentWeakReference.get().getActivity() != null
+            && !mFragmentWeakReference.get().getActivity().isFinishing();
   }
 
   private List<NavigationItem> buildMainMenu() {
@@ -101,16 +141,16 @@ public class MainMenuTask extends AsyncTask<Void, Void, List<NavigationItem>> {
 
     String[] mNavigationArray = mainActivity.getResources().getStringArray(R.array.navigation_list);
     TypedArray mNavigationIconsArray = mainActivity.getResources()
-        .obtainTypedArray(R.array.navigation_list_icons);
+            .obtainTypedArray(R.array.navigation_list_icons);
     TypedArray mNavigationIconsSelectedArray = mainActivity.getResources().obtainTypedArray(R.array
-        .navigation_list_icons_selected);
+            .navigation_list_icons_selected);
 
     final List<NavigationItem> items = new ArrayList<>();
     for (int i = 0; i < mNavigationArray.length; i++) {
       if (!checkSkippableItem(i)) {
         NavigationItem item = new NavigationItem(i, mNavigationArray[i],
-            mNavigationIconsArray.getResourceId(i,
-                0), mNavigationIconsSelectedArray.getResourceId(i, 0));
+                mNavigationIconsArray.getResourceId(i,
+                        0), mNavigationIconsSelectedArray.getResourceId(i, 0));
         items.add(item);
       }
     }
@@ -118,37 +158,18 @@ public class MainMenuTask extends AsyncTask<Void, Void, List<NavigationItem>> {
   }
 
   private boolean checkSkippableItem(int i) {
-    boolean skippable = false;
     boolean dynamicMenu = Prefs.getBoolean(PREF_DYNAMIC_MENU, true);
     DynamicNavigationLookupTable dynamicNavigationLookupTable = null;
     if (dynamicMenu) {
       dynamicNavigationLookupTable = DynamicNavigationLookupTable.getInstance();
     }
-    switch (i) {
-      case Navigation.REMINDERS:
-        if (dynamicMenu && dynamicNavigationLookupTable.getReminders() == 0) {
-          skippable = true;
-        }
-        break;
-      case Navigation.UNCATEGORIZED:
-        boolean showUncategorized = Prefs.getBoolean(PREF_SHOW_UNCATEGORIZED, false);
-        if (!showUncategorized || (dynamicMenu
-            && dynamicNavigationLookupTable.getUncategorized() == 0)) {
-          skippable = true;
-        }
-        break;
-      case Navigation.ARCHIVE:
-        if (dynamicMenu && dynamicNavigationLookupTable.getArchived() == 0) {
-          skippable = true;
-        }
-        break;
-      case Navigation.TRASH:
-        if (dynamicMenu && dynamicNavigationLookupTable.getTrashed() == 0) {
-          skippable = true;
-        }
-        break;
-    }
-    return skippable;
+    HashMap<Integer, String> typesMap = new HashMap<Integer, String>();
+    typesMap.put(0,"NOTE");
+    typesMap.put(1,"ARCHIVE");
+    typesMap.put(2,"ARCHIVE");
+    typesMap.put(3,"TRASH");
+    typesMap.put(4,"UNCATEGORIZED");
+    return NavigationTypes.valueOf(typesMap.get(i)).checkNavigation(dynamicMenu,dynamicNavigationLookupTable );
   }
 
 }
